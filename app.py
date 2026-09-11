@@ -4,15 +4,15 @@ import streamlit as st
 
 # Seitenkonfiguration
 st.set_page_config(
-    page_title="Vinted Lookbook & Wiederverkäuferassistent",
+    page_title="Vinted Lookbook & Reseller Assistent",
     page_icon="🛍️",
     layout="centered",
 )
 
-st.title("🛍️ Vinted Lookbook & Wiederverkäuferassistent")
+st.title("🛍️ Vinted Lookbook & Reseller Assistent")
 st.write(
-    "Lade deine Produktfotos hoch – die KI optimiert sie und erstellt ein"
-    " suchstarkes Vinted-Listing ohne erfundene Maße!"
+    "Lade deine Produktfotos hoch – wähle zwischen Model-Lookbook oder"
+    " edlem Beton-Flatlay und erhalte dein suchstarkes Vinted-Listing!"
 )
 
 # Sidebar für Einstellungen / API-Key
@@ -31,18 +31,30 @@ else:
 # Hauptbereich: Datei-Upload für die Produktfotos
 st.markdown("### 📸 Produktfotos hochladen")
 uploaded_files = st.file_uploader(
-    "Lade alle Fotos hoch (Ganzansicht, Details, Etikett)",
+    "Lade alle Fotos hoch (Ansichten, Details, Etikett)",
     type=["jpg", "jpeg", "png"],
     accept_multiple_files=True,
 )
 
-# Produktbeschreibung Eingabe
+# Universelles Eingabefeld für jedes Produkt
 product_description_input = st.text_input(
-    "Kurze Beschreibung als Referenz (z.B. Blaue Adidas Jacke Gr. M)",
-    value="blue Adidas zip-up sports jacket with white stripes",
+    "Was ist das für ein Produkt? (Kurze Beschreibung für die KI)",
+    value="vintage Adidas sweatpants track pants",
 )
 
-if st.button("✨ Alle Fotos bearbeiten & SEO-Listing generieren"):
+# Stil-Auswahl für das perfekte Bild
+image_style = st.radio(
+    "🎨 Wie soll das Präsentationsbild aussehen?",
+    [
+        "Professioneller Lookbook-Model-Shot",
+        (
+            "Glatte, perfekt ausgelegte Kleidung auf urbanem Beton"
+            " (Flatlay-Stil)"
+        ),
+    ],
+)
+
+if st.button("✨ Bild & SEO-Listing generieren"):
   api_key = st.session_state.get("openai_api_key", "")
   if not api_key:
     st.warning("⚠️ Bitte trage links in der Sidebar deinen OpenAI API-Key ein.")
@@ -52,75 +64,42 @@ if st.button("✨ Alle Fotos bearbeiten & SEO-Listing generieren"):
     client = openai.OpenAI(api_key=api_key)
 
     try:
-      # 1. Jedes einzelne hochgeladene Foto bearbeiten
-      st.success("✅ Alle Fotos erfolgreich verarbeitet!")
-      st.markdown("### 🖼️ Bearbeitete & Optimierte Produktfotos")
-
-      for idx, uploaded_file in enumerate(uploaded_files):
-        with st.spinner(
-            f"Bearbeite Foto {idx + 1} basierend auf dem Original..."
-        ):
-          image_bytes = uploaded_file.getvalue()
-          base64_image = base64.b64encode(image_bytes).decode("utf-8")
-
-          analysis_response = client.chat.completions.create(
-              model="gpt-4o",
-              messages=[
-                  {
-                      "role": "system",
-                      "content": (
-                          "Du bist ein Experte für Produktfotografie. Analysiere"
-                          " das hochgeladene Foto exakt (ob Gesamtansicht,"
-                          " Detail oder Etikett). Erstelle einen präzisen"
-                          " Bildgenerierungs-Prompt auf Englisch, der genau"
-                          " dieses Foto in perfekter, professioneller"
-                          " Studio-Qualität wiedergibt, ohne den Inhalt zu"
-                          " verfälschen."
-                      ),
-                  },
-                  {
-                      "role": "user",
-                      "content": [
-                          {
-                              "type": "text",
-                              "text": (
-                                  "Erstelle einen exakten Prompt zur"
-                                  " Optimierung dieses spezifischen Fotos."
-                              ),
-                          },
-                          {
-                              "type": "image_url",
-                              "image_url": {
-                                  "url": f"data:image/jpeg;base64,{base64_image}"
-                              },
-                          },
-                      ],
-                  },
-              ],
-              max_tokens=300,
+      # 1. Bildgenerierung je nach Wunsch-Stil
+      with st.spinner("🎨 Generiere professionelles Produktbild..."):
+        if "Model" in image_style:
+          selected_prompt = (
+              f"A professional commercial fashion lookbook photograph of a"
+              f" stylish urban outfit featuring: {product_description_input}, worn"
+              " by a model in a modern bright minimalist studio with soft"
+              " natural light, editorial fashion style, ultra-realistic, 4k."
           )
-          generated_prompt = analysis_response.choices[0].message.content
-
-          img_response = client.images.generate(
-              model="gpt-image-1.5",
-              prompt=(
-                  f"Professional e-commerce product photo, exact replica of:"
-                  f" {generated_prompt}. Clean lighting, professional studio"
-                  " background."
-              ),
-              size="1024x1024",
-              quality="high",
-              n=1,
-          )
-          processed_img_bytes = base64.b64decode(img_response.data[0].b64_json)
-
-          st.image(
-              processed_img_bytes,
-              caption=f"Optimiertes Foto {idx + 1}",
-              use_container_width=True,
+        else:
+          selected_prompt = (
+              "A professional high-end e-commerce product photograph of smooth,"
+              " perfectly arranged clothing item ("
+              f" {product_description_input} ) neatly laid out on a clean,"
+              " modern urban grey polished concrete floor, top-down flatlay"
+              " view, perfect soft studio lighting, gorgeous aesthetic, 4k."
           )
 
-      # 2. Vinted SEO Listing mit starken Keywords und OHNE erfundene Maße generieren
+        img_response = client.images.generate(
+            model="gpt-image-1.5",
+            prompt=selected_prompt,
+            size="1024x1024",
+            quality="high",
+            n=1,
+        )
+        model_image_bytes = base64.b64decode(img_response.data[0].b64_json)
+
+      st.success("✅ Bild erfolgreich erstellt!")
+      st.markdown("### 🖼️ Präsentations-Bild")
+      st.image(
+          model_image_bytes,
+          caption=f"Stil: {image_style} ({product_description_input})",
+          use_container_width=True,
+      )
+
+      # 2. Vinted SEO Listing mit starken Keywords und OHNE erfundene Maße für JEDES Produkt
       with st.spinner("📝 Generiere keyword-optimierten Vinted-Text..."):
         seo_response = client.chat.completions.create(
             model="gpt-4o",
@@ -129,14 +108,14 @@ if st.button("✨ Alle Fotos bearbeiten & SEO-Listing generieren"):
                     "role": "system",
                     "content": (
                         "Du bist ein professioneller Vinted Reseller Experte."
-                        " Erstelle ein verkaufsstarkes Listing.\n"
+                        " Erstelle ein verkaufsstarkes Listing für ein"
+                        " beliebiges Mode- oder Lifestyle-Produkt.\n"
                         "REGELN:\n"
                         "1. Der TITEL muss vollgepackt sein mit wichtigen"
-                        " Such-Keywords (Marke, Produktart, Farbe, Stil,"
-                        " Größe, z.B. 'Adidas Trainingsjacke Zip-Up Retro Blau"
-                        " Gr. M Streetwear').\n"
-                        "2. Erstelle eine saubere Beschreibung mit Emojis"
-                        " (Zustand, Material etc.).\n"
+                        " Such-Keywords (Marke, genaues Produkt, Farbe, Stil,"
+                        " Zustand, Größe).\n"
+                        "2. Erstelle eine saubere, übersichtliche Beschreibung"
+                        " mit Emojis (Zustand, Material etc.).\n"
                         "3. WICHTIG: Erfinde NIEMALS Maße (keine Zentimeter"
                         " angeben). Schreibe stattdessen: 'Maße siehe Fotos"
                         " (Etikett) oder bei Bedarf gerne nachfragen'.\n"
@@ -146,8 +125,8 @@ if st.button("✨ Alle Fotos bearbeiten & SEO-Listing generieren"):
                 {
                     "role": "user",
                     "content": (
-                        "Erstelle das perfekte Vinted-Listing für:"
-                        f" {product_description_input}"
+                        "Erstelle das perfekte Vinted-Listing für dieses"
+                        f" Produkt: {product_description_input}"
                     ),
                 },
             ],
