@@ -4,12 +4,12 @@ import streamlit as st
 
 # Seitenkonfiguration
 st.set_page_config(
-    page_title="Vinted Lookbook & Reseller Assistant",
+    page_title="Vinted Lookbook & Wiederverkäuferassistent",
     page_icon="🛍️",
     layout="centered",
 )
 
-st.title("🛍️ Vinted Lookbook & Reseller Assistant")
+st.title("🛍️ Vinted Lookbook & Wiederverkäuferassistent")
 st.write(
     "Lade deine Produktfotos hoch, lass professionelle Kampagnen-Bilder (Model"
     " & Detail) per KI generieren und erhalte perfekte Vinted-SEO-Texte!"
@@ -58,15 +58,14 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
         model_prompt = (
             f"A professional high-end fashion campaign lookbook photo of a model"
             f" wearing {product_description_input}, staged in a stylish urban"
-            " loft with natural window light, photorealistic, 8k resolution,"
-            " editorial style."
+            " loft with natural window light, photorealistic, editorial style."
         )
 
+        # Auf dall-e-2 geändert, da universell verfügbar
         model_response = client.images.generate(
-            model="dall-e-3",
+            model="dall-e-2",
             prompt=model_prompt,
             size="1024x1024",
-            quality="standard",
             n=1,
         )
         model_image_url = model_response.data[0].url
@@ -79,10 +78,9 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
         )
 
         detail_response = client.images.generate(
-            model="dall-e-3",
+            model="dall-e-2",
             prompt=detail_prompt,
             size="1024x1024",
-            quality="standard",
             n=1,
         )
         detail_image_url = detail_response.data[0].url
