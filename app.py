@@ -1,49 +1,5 @@
 
-[09:39, 11.9.2026] Jan: import base64
-import io
-import os
-from PIL import Image
-from openai import OpenAI
-from rembg import remove
-import streamlit as st
-
-# Streamlit Layout
-st.set_page_config(
-    page_title="Vinted AI Reseller Assistant", page_icon="🛍️", layout="wide"
-)
-
-st.title("🛍️ Vinted AI Reseller Tool")
-st.write(
-    "Lade Produktfotos hoch, lass den Hintergrund entfernen und generiere"
-    " perfekte SEO-Texte & Hashtags."
-)
-
-# Sidebar für API Key
-st.sidebar.header("🔑 Einstellungen")
-api_key_input = st.sidebar.text_input(
-    "OpenAI API Key eingeben", type="password"
-)
-
-if api_key_input:
-  os.environ["OPENAI_API_KEY"] = api_key_input
-
-# Mehrere Bilder hochladen
-uploaded_files = st.file_uploader(
-    "Produktfotos hochladen (Vorderseite, Rückseite, Etikett etc.)",
-    t…
-[09:59, 11.9.2026] Jan: streamlit
-openai
-rembg
-pillow
-numpy<2
-[10:04, 11.9.2026] Jan: streamlit
-openai
-rembg
-pillow
-numpy<2
-onnxruntime
-[10:09, 11.9.2026] Jan: https://platform.openai.com/api-keys
-[10:46, 11.9.2026] Jan: import openai
+import openai
 import streamlit as st
 
 # Seitenkonfiguration
@@ -53,7 +9,7 @@ st.set_page_config(
     layout="centered",
 )
 
-st.Title("🛍️ Vinted Lookbook & Reseller Assistant")
+st.title("🛍️ Vinted Lookbook & Reseller Assistant")
 st.write(
     "Lade deine Produktfotos hoch, lass professionelle Kampagnen-Bilder (Model"
     " & Detail) per KI generieren und erhalte perfekte Vinted-SEO-Texte!"
@@ -69,7 +25,6 @@ if api_key_input:
   st.session_state["openai_api_key"] = api_key_input
   st.sidebar.success("API-Key gespeichert!")
 else:
-  # Versuche Key aus den Streamlit Secrets zu laden, falls vorhanden
   if "OPENAI_API_KEY" in st.secrets:
     st.session_state["openai_api_key"] = st.secrets["OPENAI_API_KEY"]
 
@@ -88,22 +43,18 @@ product_description_input = st.text_input(
 )
 
 if st.button("✨ Lookbook-Bilder & Listing generieren"):
-  # Prüfen ob API Key da ist
   api_key = st.session_state.get("openai_api_key", "")
   if not api_key:
     st.warning("⚠️ Bitte trage links in der Sidebar deinen OpenAI API-Key ein.")
   elif not uploaded_files:
     st.warning("⚠️ Bitte lade mindestens ein Produktfoto hoch.")
   else:
-    # OpenAI Client initialisieren
     client = openai.OpenAI(api_key=api_key)
 
     try:
-      # 1. DALL-E 3 Bildgenerierung für Lookbook
       with st.spinner(
           "🎨 Generiere professionelles Lookbook (Model-Shot) & Detail-Shot..."
       ):
-        # Prompt 1: Model Shot
         model_prompt = (
             f"A professional high-end fashion campaign lookbook photo of a model"
             f" wearing {product_description_input}, staged in a stylish urban"
@@ -120,7 +71,6 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
         )
         model_image_url = model_response.data[0].url
 
-        # Prompt 2: Detail Shot (Schild auf Beton)
         detail_prompt = (
             f"A professional product detail flat lay photo of"
             f" {product_description_input} showing the inner size label"
@@ -139,7 +89,6 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
 
       st.success("✅ Lookbook-Bilder erfolgreich generiert!")
 
-      # Ergebnisse anzeigen
       st.markdown("### 🖼️ Generierte Lookbook-Bilder")
       col1, col2 = st.columns(2)
       with col1:
@@ -155,7 +104,6 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
             use_container_width=True,
         )
 
-      # 2. Vinted SEO Listing generieren via GPT-4o
       with st.spinner("📝 Generiere optimierten Vinted-SEO-Text..."):
         seo_response = client.chat.completions.create(
             model="gpt-4o",
