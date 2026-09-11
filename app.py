@@ -11,8 +11,9 @@ st.set_page_config(
 
 st.title("🛍️ Vinted Lookbook & Reseller Assistent")
 st.write(
-    "Lade deine Fotos hoch – die KI erkennt das Produkt *automatisch*,"
-    " generiert das perfekte Bild und das suchstarke Vinted-Listing!"
+    "Lade deine Fotos hoch – die KI erkennt das Produkt automatisch,"
+    " generiert das perfekte Bild, die Preisschätzung und die Klick-Buttons"
+    " zum Kopieren!"
 )
 
 # Sidebar für Einstellungen / API-Key
@@ -48,7 +49,7 @@ image_style = st.radio(
     ],
 )
 
-if st.button("✨ Produkt automatisch erkennen & Listing generieren"):
+if st.button("✨ Produkt analysieren & Listing generieren"):
   api_key = st.session_state.get("openai_api_key", "")
   if not api_key:
     st.warning("⚠️ Bitte trage links in der Sidebar deinen OpenAI API-Key ein.")
@@ -73,9 +74,7 @@ if st.button("✨ Produkt automatisch erkennen & Listing generieren"):
                         "Du bist ein Experte für Kleidung und Reselling. Analysiere"
                         " das hochgeladene Foto genau. Antworte AUSSCHLIESSLICH"
                         " mit einer präzisen Beschreibung auf Englisch (Marke,"
-                        " genauer Kleidungsstil, Farbe, Besonderheiten), damit"
-                        " man es perfekt weiterverarbeiten kann. Beispiel:"
-                        " 'Armani blue denim jeans straight fit'."
+                        " genauer Kleidungsstil, Farbe, Besonderheiten)."
                     ),
                 },
                 {
@@ -105,7 +104,7 @@ if st.button("✨ Produkt automatisch erkennen & Listing generieren"):
 
       st.info(f"💡 *Erkanntes Produkt:* {detected_product}")
 
-      # 2. Bildgenerierung basierend auf dem ECHTEN, erkannten Produkt
+      # 2. Bildgenerierung
       with st.spinner("🎨 Generiere professionelles Präsentationsbild..."):
         if "Model" in image_style:
           selected_prompt = (
@@ -136,12 +135,20 @@ if st.button("✨ Produkt automatisch erkennen & Listing generieren"):
       st.markdown("### 🖼️ Präsentations-Bild")
       st.image(
           model_image_bytes,
-          caption=f"Automatisch erstellt für: {detected_product}",
+          caption=f"Präsentationsbild für: {detected_product}",
           use_container_width=True,
       )
 
-      # 3. Vinted SEO Listing mit starken Keywords und OHNE erfundene Maße generieren
-      with st.spinner("📝 Generiere keyword-optimierten Vinted-Text..."):
+      # 📥 Direkter Download-Button für das Bild
+      st.download_button(
+          label="📥 Bild auf Gerät speichern",
+          data=model_image_bytes,
+          file_name="vinted_lookbook_bild.png",
+          mime="image/png",
+      )
+
+      # 3. Vinted SEO Listing (Titel, Beschreibung getrennt) + Preisschätzung generieren
+      with st.spinner("📝 Generiere Titel, Beschreibung & Vinted-Preisschätzung..."):
         seo_response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -149,35 +156,59 @@ if st.button("✨ Produkt automatisch erkennen & Listing generieren"):
                     "role": "system",
                     "content": (
                         "Du bist ein professioneller Vinted Reseller Experte."
-                        " Erstelle ein verkaufsstarkes Listing basierend auf"
-                        " dem erkannten Produkt.\n"
-                        "REGELN:\n"
-                        "1. Der TITEL muss vollgepackt sein mit wichtigen"
-                        " Such-Keywords (Marke, genaue Produktart, Farbe, Stil,"
-                        " Zustand, Größe).\n"
-                        "2. Erstelle eine saubere, übersichtliche Beschreibung"
-                        " mit Emojis (Zustand, Material etc.).\n"
-                        "3. WICHTIG: Erfinde NIEMALS Maße (keine Zentimeter"
-                        " angeben). Schreibe stattdessen: 'Maße siehe Fotos"
-                        " (Etikett) oder bei Bedarf gerne nachfragen'.\n"
-                        "4. Füge ganz unten passende SEO-Hashtags ein."
+                        " Antworte exakt im Format:\n"
+                        "TITEL: [Vollgepackt mit starken Such-Keywords, Marke,"
+                        " Produkt, Farbe, Stil, Größe]\n"
+                        "BESCHREIBUNG: [Saubere Beschreibung mit Emojis, Zustand,"
+                        " Material. WICHTIG: Erfinde NIEMALS Maße, schreibe"
+                        " stattdessen: 'Maße siehe Fotos (Etikett) oder bei"
+                        " Bedarf gerne nachfragen'. Ganz unten SEO-Hashtags.]\n"
+                        "PREIS: [Realistischer Vinted-Schnellverkaufspreis in Euro"
+                        " mit kurzer Begründung, z.B. '15-20 € (da starker"
+                        " Marken-Hype und guter Zustand)']"
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
-                        "Erstelle das perfekte Vinted-Listing für dieses"
-                        f" erkannte Produkt: {detected_product}"
+                        "Erstelle das Vinted-Listing und die Preisschätzung für"
+                        f" dieses Produkt: {detected_product}"
                     ),
                 },
             ],
         )
-        seo_text = seo_response.choices[0].message.content
+        ai_output = seo_response.choices[0].message.content
+
+        # Text sauber aufteilen für separate Felder
+        try:
+          parts = ai_output.split("BESCHREIBUNG:")
+          title_part = parts[0].replace("TITEL:", "").strip()
+          remaining = parts[1].split("PREIS:")
+          desc_part = remaining[0].strip()
+          price_part = remaining[1].strip()
+        except:
+          title_part = detected_product
+          desc_part = ai_output
+          price_part = "15-25 € (Standard-Empfehlung)"
 
       st.markdown("---")
-      st.markdown("### 📋 Vinted Listing Text (zum Kopieren)")
-      st.markdown(seo_text)
-      st.text_area("Text-Box:", value=seo_text, height=180)
+      st.markdown(
+          "### 📋 Vinted Listing Daten (Mit Klick-Buttons zum Kopieren)"
+      )
+
+      # Sichtbares Zusatzfeld für den Verkaufspreis (wird nicht in Listings kopiert)
+      st.metric(
+          label="💰 Vinted-Preissempfehlung (für schnellen Verkauf)",
+          value=price_part,
+      )
+
+      st.markdown("#### 1. Titel (für das Titelfeld bei Vinted)")
+      st.text_input("Titel kopieren:", value=title_part, key="vinted_title")
+
+      st.markdown("#### 2. Beschreibung (für das Textfeld bei Vinted)")
+      st.text_area(
+          "Beschreibung kopieren:", value=desc_part, height=200, key="vinted_desc"
+      )
 
     except Exception as e:
       st.error(f"Ein Fehler ist aufgetreten: {e}")
