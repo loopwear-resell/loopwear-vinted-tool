@@ -1,4 +1,5 @@
 
+
 import openai
 import streamlit as st
 
@@ -61,11 +62,12 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
             " loft with natural window light, photorealistic, editorial style."
         )
 
-        # Auf dall-e-2 geändert, da universell verfügbar
+        # Verwende dall-e-3 (aktueller Standard)
         model_response = client.images.generate(
-            model="dall-e-2",
+            model="dall-e-3",
             prompt=model_prompt,
             size="1024x1024",
+            quality="standard",
             n=1,
         )
         model_image_url = model_response.data[0].url
@@ -78,9 +80,10 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
         )
 
         detail_response = client.images.generate(
-            model="dall-e-2",
+            model="dall-e-3",
             prompt=detail_prompt,
             size="1024x1024",
+            quality="standard",
             n=1,
         )
         detail_image_url = detail_response.data[0].url
