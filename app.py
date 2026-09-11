@@ -11,8 +11,8 @@ st.set_page_config(
 
 st.title("🛍️ Vinted Lookbook & Reseller Assistent")
 st.write(
-    "Lade deine Produktfotos hoch – wähle zwischen Model-Lookbook oder"
-    " edlem Beton-Flatlay und erhalte dein suchstarkes Vinted-Listing!"
+    "Lade deine Fotos hoch – die KI erkennt das Produkt *automatisch*,"
+    " generiert das perfekte Bild und das suchstarke Vinted-Listing!"
 )
 
 # Sidebar für Einstellungen / API-Key
@@ -36,12 +36,6 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True,
 )
 
-# Universelles Eingabefeld für jedes Produkt
-product_description_input = st.text_input(
-    "Was ist das für ein Produkt? (Kurze Beschreibung für die KI)",
-    value="vintage Adidas sweatpants track pants",
-)
-
 # Stil-Auswahl für das perfekte Bild
 image_style = st.radio(
     "🎨 Wie soll das Präsentationsbild aussehen?",
@@ -54,7 +48,7 @@ image_style = st.radio(
     ],
 )
 
-if st.button("✨ Bild & SEO-Listing generieren"):
+if st.button("✨ Produkt automatisch erkennen & Listing generieren"):
   api_key = st.session_state.get("openai_api_key", "")
   if not api_key:
     st.warning("⚠️ Bitte trage links in der Sidebar deinen OpenAI API-Key ein.")
@@ -64,22 +58,69 @@ if st.button("✨ Bild & SEO-Listing generieren"):
     client = openai.OpenAI(api_key=api_key)
 
     try:
-      # 1. Bildgenerierung je nach Wunsch-Stil
-      with st.spinner("🎨 Generiere professionelles Produktbild..."):
+      # Wir nehmen das erste hochgeladene Foto, um das Produkt automatisch zu erkennen
+      first_image_bytes = uploaded_files[0].getvalue()
+      base64_first_image = base64.b64encode(first_image_bytes).decode("utf-8")
+
+      # 1. Automatische Produkterkennung via GPT-4o Vision
+      with st.spinner("🔍 Analysiere deine Fotos automatisch..."):
+        vision_response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Du bist ein Experte für Kleidung und Reselling. Analysiere"
+                        " das hochgeladene Foto genau. Antworte AUSSCHLIESSLICH"
+                        " mit einer präzisen Beschreibung auf Englisch (Marke,"
+                        " genauer Kleidungsstil, Farbe, Besonderheiten), damit"
+                        " man es perfekt weiterverarbeiten kann. Beispiel:"
+                        " 'Armani blue denim jeans straight fit'."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Was genau ist das für ein Kleidungsstück auf"
+                                " dem Foto?"
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": (
+                                    f"data:image/jpeg;base64,{base64_first_image}"
+                                )
+                            },
+                        },
+                    ],
+                },
+            ],
+            max_tokens=100,
+        )
+        detected_product = vision_response.choices[0].message.content.strip()
+
+      st.info(f"💡 *Erkanntes Produkt:* {detected_product}")
+
+      # 2. Bildgenerierung basierend auf dem ECHTEN, erkannten Produkt
+      with st.spinner("🎨 Generiere professionelles Präsentationsbild..."):
         if "Model" in image_style:
           selected_prompt = (
               f"A professional commercial fashion lookbook photograph of a"
-              f" stylish urban outfit featuring: {product_description_input}, worn"
-              " by a model in a modern bright minimalist studio with soft"
-              " natural light, editorial fashion style, ultra-realistic, 4k."
+              f" stylish urban outfit featuring: {detected_product}, worn by a"
+              " model in a modern bright minimalist studio with soft natural"
+              " light, editorial fashion style, ultra-realistic, 4k."
           )
         else:
           selected_prompt = (
               "A professional high-end e-commerce product photograph of smooth,"
               " perfectly arranged clothing item ("
-              f" {product_description_input} ) neatly laid out on a clean,"
-              " modern urban grey polished concrete floor, top-down flatlay"
-              " view, perfect soft studio lighting, gorgeous aesthetic, 4k."
+              f" {detected_product} ) neatly laid out on a clean, modern urban"
+              " grey polished concrete floor, top-down flatlay view, perfect"
+              " soft studio lighting, gorgeous aesthetic, 4k."
           )
 
         img_response = client.images.generate(
@@ -95,11 +136,11 @@ if st.button("✨ Bild & SEO-Listing generieren"):
       st.markdown("### 🖼️ Präsentations-Bild")
       st.image(
           model_image_bytes,
-          caption=f"Stil: {image_style} ({product_description_input})",
+          caption=f"Automatisch erstellt für: {detected_product}",
           use_container_width=True,
       )
 
-      # 2. Vinted SEO Listing mit starken Keywords und OHNE erfundene Maße für JEDES Produkt
+      # 3. Vinted SEO Listing mit starken Keywords und OHNE erfundene Maße generieren
       with st.spinner("📝 Generiere keyword-optimierten Vinted-Text..."):
         seo_response = client.chat.completions.create(
             model="gpt-4o",
@@ -108,11 +149,11 @@ if st.button("✨ Bild & SEO-Listing generieren"):
                     "role": "system",
                     "content": (
                         "Du bist ein professioneller Vinted Reseller Experte."
-                        " Erstelle ein verkaufsstarkes Listing für ein"
-                        " beliebiges Mode- oder Lifestyle-Produkt.\n"
+                        " Erstelle ein verkaufsstarkes Listing basierend auf"
+                        " dem erkannten Produkt.\n"
                         "REGELN:\n"
                         "1. Der TITEL muss vollgepackt sein mit wichtigen"
-                        " Such-Keywords (Marke, genaues Produkt, Farbe, Stil,"
+                        " Such-Keywords (Marke, genaue Produktart, Farbe, Stil,"
                         " Zustand, Größe).\n"
                         "2. Erstelle eine saubere, übersichtliche Beschreibung"
                         " mit Emojis (Zustand, Material etc.).\n"
@@ -126,7 +167,7 @@ if st.button("✨ Bild & SEO-Listing generieren"):
                     "role": "user",
                     "content": (
                         "Erstelle das perfekte Vinted-Listing für dieses"
-                        f" Produkt: {product_description_input}"
+                        f" erkannte Produkt: {detected_product}"
                     ),
                 },
             ],
