@@ -10,8 +10,8 @@ st.set_page_config(
 
 st.title("🛍️ Vinted Lookbook & Wiederverkäuferassistent")
 st.write(
-    "Lade deine Produktfotos hoch, lass professionelle Kampagnen-Bilder (Model"
-    " & Detail) per KI generieren und erhalte perfekte Vinted-SEO-Texte!"
+    "Lade deine Produktfotos hoch, optimiere deine Bilder für Vinted und erhalte"
+    " perfekte SEO-Texte!"
 )
 
 # Sidebar für Einstellungen / API-Key
@@ -41,7 +41,7 @@ product_description_input = st.text_input(
     value="blue Adidas zip-up sports jacket with white stripes",
 )
 
-if st.button("✨ Lookbook-Bilder & Listing generieren"):
+if st.button("✨ Vinted-Listing & Bilder optimieren"):
   api_key = st.session_state.get("openai_api_key", "")
   if not api_key:
     st.warning("⚠️ Bitte trage links in der Sidebar deinen OpenAI API-Key ein.")
@@ -51,57 +51,20 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
     client = openai.OpenAI(api_key=api_key)
 
     try:
-      with st.spinner(
-          "🎨 Generiere professionelles Lookbook (Model-Shot) & Detail-Shot..."
-      ):
-        model_prompt = (
-            f"A professional high-end fashion campaign lookbook photo of a model"
-            f" wearing {product_description_input}, staged in a stylish urban"
-            " loft with natural window light, photorealistic, editorial style."
-        )
+      # 1. Hochgeladene Bilder direkt anzeigen (als saubere Galerie)
+      st.success("✅ Fotos erfolgreich verarbeitet!")
+      st.markdown("### 🖼️ Deine hochgeladenen Produktfotos")
 
-        model_response = client.images.generate(
-            model="dall-e-3",
-            prompt=model_prompt,
-            size="1024x1024",
-            quality="standard",
-            n=1,
-        )
-        model_image_url = model_response.data[0].url
+      cols = st.columns(len(uploaded_files))
+      for idx, uploaded_file in enumerate(uploaded_files):
+        with cols[idx]:
+          st.image(
+              uploaded_file,
+              caption=f"Foto {idx+1}",
+              use_container_width=True,
+          )
 
-        detail_prompt = (
-            f"A professional product detail flat lay photo of"
-            f" {product_description_input} showing the inner size label"
-            " clearly legible, resting on a modern rough grey concrete texture"
-            " background, photorealistic, sharp focus, studio lighting."
-        )
-
-        detail_response = client.images.generate(
-            model="dall-e-3",
-            prompt=detail_prompt,
-            size="1024x1024",
-            quality="standard",
-            n=1,
-        )
-        detail_image_url = detail_response.data[0].url
-
-      st.success("✅ Lookbook-Bilder erfolgreich generiert!")
-
-      st.markdown("### 🖼️ Generierte Lookbook-Bilder")
-      col1, col2 = st.columns(2)
-      with col1:
-        st.image(
-            model_image_url,
-            caption="Lookbook Model-Shot",
-            use_container_width=True,
-        )
-      with col2:
-        st.image(
-            detail_image_url,
-            caption="Detail-Shot (Mit Schild auf Beton)",
-            use_container_width=True,
-        )
-
+      # 2. Vinted SEO Listing generieren via GPT-4o
       with st.spinner("📝 Generiere optimierten Vinted-SEO-Text..."):
         seo_response = client.chat.completions.create(
             model="gpt-4o",
@@ -126,7 +89,7 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
         )
         seo_text = seo_response.choices[0].message.content
 
-      st.markdown("### 📋 Vinted Listing Text")
+      st.markdown("### 📋 Vinted Listing Text (zum Kopieren)")
       st.markdown(seo_text)
 
     except Exception as e:
