@@ -1,4 +1,5 @@
-import base64
+
+[09:39, 11.9.2026] Jan: import base64
 import io
 import os
 from PIL import Image
@@ -29,109 +30,158 @@ if api_key_input:
 # Mehrere Bilder hochladen
 uploaded_files = st.file_uploader(
     "Produktfotos hochladen (Vorderseite, Rückseite, Etikett etc.)",
+    t…
+[09:59, 11.9.2026] Jan: streamlit
+openai
+rembg
+pillow
+numpy<2
+[10:04, 11.9.2026] Jan: streamlit
+openai
+rembg
+pillow
+numpy<2
+onnxruntime
+[10:09, 11.9.2026] Jan: https://platform.openai.com/api-keys
+[10:46, 11.9.2026] Jan: import openai
+import streamlit as st
+
+# Seitenkonfiguration
+st.set_page_config(
+    page_title="Vinted Lookbook & Reseller Assistant",
+    page_icon="🛍️",
+    layout="centered",
+)
+
+st.Title("🛍️ Vinted Lookbook & Reseller Assistant")
+st.write(
+    "Lade deine Produktfotos hoch, lass professionelle Kampagnen-Bilder (Model"
+    " & Detail) per KI generieren und erhalte perfekte Vinted-SEO-Texte!"
+)
+
+# Sidebar für Einstellungen / API-Key
+st.sidebar.header("⚙️ Einstellungen")
+api_key_input = st.sidebar.text_input(
+    "OpenAI API-Key", type="password", help="Trage hier deinen OpenAI API-Key ein."
+)
+
+if api_key_input:
+  st.session_state["openai_api_key"] = api_key_input
+  st.sidebar.success("API-Key gespeichert!")
+else:
+  # Versuche Key aus den Streamlit Secrets zu laden, falls vorhanden
+  if "OPENAI_API_KEY" in st.secrets:
+    st.session_state["openai_api_key"] = st.secrets["OPENAI_API_KEY"]
+
+# Hauptbereich: Datei-Upload für die Produktfotos
+st.markdown("### 📸 Produktfotos hochladen")
+uploaded_files = st.file_uploader(
+    "Lade Fotos hoch (z.B. Ganzansicht & Größenschild)",
     type=["jpg", "jpeg", "png"],
     accept_multiple_files=True,
 )
 
-if uploaded_files:
-  st.subheader("📸 Bearbeitete Bilder (Hintergrund entfernt)")
-  cols = st.columns(len(uploaded_files))
+# Produktbeschreibung Eingabe
+product_description_input = st.text_input(
+    "Produktbeschreibung (z.B. Blaue Adidas Trainingsjacke Gr. M)",
+    value="blue Adidas zip-up sports jacket with white stripes",
+)
 
-  processed_images_base64 = []
-  client = OpenAI()
+if st.button("✨ Lookbook-Bilder & Listing generieren"):
+  # Prüfen ob API Key da ist
+  api_key = st.session_state.get("openai_api_key", "")
+  if not api_key:
+    st.warning("⚠️ Bitte trage links in der Sidebar deinen OpenAI API-Key ein.")
+  elif not uploaded_files:
+    st.warning("⚠️ Bitte lade mindestens ein Produktfoto hoch.")
+  else:
+    # OpenAI Client initialisieren
+    client = openai.OpenAI(api_key=api_key)
 
-  for idx, uploaded_file in enumerate(uploaded_files):
-    image = Image.open(uploaded_file)
+    try:
+      # 1. DALL-E 3 Bildgenerierung für Lookbook
+      with st.spinner(
+          "🎨 Generiere professionelles Lookbook (Model-Shot) & Detail-Shot..."
+      ):
+        # Prompt 1: Model Shot
+        model_prompt = (
+            f"A professional high-end fashion campaign lookbook photo of a model"
+            f" wearing {product_description_input}, staged in a stylish urban"
+            " loft with natural window light, photorealistic, 8k resolution,"
+            " editorial style."
+        )
 
-    # Hintergrund entfernen mit rembg
-    input_bytes = io.BytesIO()
-    image.save(input_bytes, format="PNG")
-    output_bytes = remove(input_bytes.getvalue())
-    processed_image = Image.open(io.BytesIO(output_bytes))
+        model_response = client.images.generate(
+            model="dall-e-3",
+            prompt=model_prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+        )
+        model_image_url = model_response.data[0].url
 
-    # Auf weißem Hintergrund platzieren
-    background = Image.new("RGB", processed_image.size, (255, 255, 255))
-    background.paste(processed_image, (0, 0), processed_image)
+        # Prompt 2: Detail Shot (Schild auf Beton)
+        detail_prompt = (
+            f"A professional product detail flat lay photo of"
+            f" {product_description_input} showing the inner size label"
+            " clearly legible, resting on a modern rough grey concrete texture"
+            " background, photorealistic, sharp focus, studio lighting."
+        )
 
-    with cols[idx]:
-      st.image(
-          background,
-          caption=f"Bild {idx+1} optimiert",
-          use_container_width=True,
-      )
+        detail_response = client.images.generate(
+            model="dall-e-3",
+            prompt=detail_prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+        )
+        detail_image_url = detail_response.data[0].url
 
-    # Bild für OpenAI vorbereiten
-    buffered = io.BytesIO()
-    background.save(buffered, format="JPEG")
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    processed_images_base64.append(img_str)
+      st.success("✅ Lookbook-Bilder erfolgreich generiert!")
 
-  # Analyse-Button
-  if st.button("🚀 Vinted-Listing generieren"):
-    if not api_key_input:
-      st.error("Bitte gib zuerst deinen OpenAI API-Key in der Sidebar ein.")
-    else:
-      with st.spinner("KI analysiert die Bilder und optimiert für SEO..."):
-        content_payload = [
-            {
-                "type": "text",
-                "text": (
-                    "Du bist ein hochprofesioneller und umsatzstarker"
-                    " Vinted-Reseller. Analysiere die hochgeladenen Fotos des"
-                    " Artikels präzise. Antworte exakt in diesem Format, damit"
-                    " ich es trennen kann:\n\n### TITEL:\n[Hier nur den"
-                    " SEO-optimierten Titel einfügen, max. 80 Zeichen]\n\n###"
-                    " BESCHREIBUNG:\n[Hier die ehrliche, professionelle"
-                    " Beschreibung mit Zustand, Material, Maßen und den Top"
-                    " 12-15 Vinted-Hashtags am Ende einfügen]"
-                ),
-            }
-        ]
+      # Ergebnisse anzeigen
+      st.markdown("### 🖼️ Generierte Lookbook-Bilder")
+      col1, col2 = st.columns(2)
+      with col1:
+        st.image(
+            model_image_url,
+            caption="Lookbook Model-Shot",
+            use_container_width=True,
+        )
+      with col2:
+        st.image(
+            detail_image_url,
+            caption="Detail-Shot (Mit Schild auf Beton)",
+            use_container_width=True,
+        )
 
-        for img_base64 in processed_images_base64:
-          content_payload.append({
-              "type": "image_url",
-              "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"},
-          })
+      # 2. Vinted SEO Listing generieren via GPT-4o
+      with st.spinner("📝 Generiere optimierten Vinted-SEO-Text..."):
+        seo_response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Du bist ein professioneller Vinted Reseller Experte."
+                        " Erstelle einen knackigen Titel, eine detaillierte"
+                        " Beschreibung und passende Hashtags für den"
+                        " Artikel."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Erstelle ein verkaufsstarkes Vinted-Listing für:"
+                        f" {product_description_input}"
+                    ),
+                },
+            ],
+        )
+        seo_text = seo_response.choices[0].message.content
 
-        try:
-          response = client.chat.completions.create(
-              model="gpt-4o",
-              messages=[{"role": "user", "content": content_payload}],
-              max_tokens=1000,
-          )
+      st.markdown("### 📋 Vinted Listing Text")
+      st.markdown(seo_text)
 
-          full_response = response.choices[0].message.content
-
-          # Text trennen in Titel und Beschreibung
-          if "### TITEL:" in full_response and "### BESCHREIBUNG:" in full_response:
-            parts = full_response.split("### BESCHREIBUNG:")
-            titel_part = (
-                parts[0].replace("### TITEL:", "").strip().strip('"')
-            )
-            beschreibung_part = parts[1].strip()
-          else:
-            titel_part = "Fehler beim Parsen"
-            beschreibung_part = full_response
-
-          st.success("Erfolgreich generiert!")
-
-          # Ausgabe für Titel mit Kopier-Hinweis
-          st.subheader("📌 Titel")
-          st.text_input("Titel zum Kopieren", value=titel_part, key="titel_out")
-          st.info(
-              "💡 Tipp: Du kannst den Titel direkt aus dem Feld oben kopieren"
-              " oder gedrückt halten."
-          )
-
-          # Ausgabe für Beschreibung
-          st.subheader("📝 Beschreibung & Hashtags")
-          st.text_area(
-              "Beschreibung zum Kopieren",
-              value=beschreibung_part,
-              height=200,
-              key="desc_out",
-          )
-
-        except Exception as e:
-          st.error(f"Ein Fehler ist aufgetreten: {e}")
+    except Exception as e:
+      st.error(f"Ein Fehler ist aufgetreten: {e}")
