@@ -1,3 +1,4 @@
+import base64
 import openai
 import streamlit as st
 
@@ -51,7 +52,7 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
     client = openai.OpenAI(api_key=api_key)
 
     try:
-      # 1. Lookbook-Bilder generieren (Model-Shot & Detail-Shot)
+      # 1. Lookbook-Bilder generieren (Model-Shot & Detail-Shot) via gpt-image-1.5
       with st.spinner(
           "🎨 Generiere Lookbook (Model-Shot & Detail auf Beton)..."
       ):
@@ -68,38 +69,38 @@ if st.button("✨ Lookbook-Bilder & Listing generieren"):
             " background, photorealistic, sharp focus, studio lighting."
         )
 
-        # Aktuelle Bilder-Generierung via OpenAI
+        # Generierung Model-Bild
         model_response = client.images.generate(
-            model="gpt-image-1",
+            model="gpt-image-1.5",
             prompt=model_prompt,
             size="1024x1024",
             quality="high",
             n=1,
         )
-        model_image_url = model_response.data[0].url
+        model_image_bytes = base64.b64decode(model_response.data[0].b64_json)
 
+        # Generierung Detail-Bild
         detail_response = client.images.generate(
-            model="gpt-image-1",
+            model="gpt-image-1.5",
             prompt=detail_prompt,
             size="1024x1024",
             quality="high",
             n=1,
         )
-        detail_image_url = detail_response.data[0].url
+        detail_image_bytes = base64.b64decode(detail_response.data[0].b64_json)
 
       st.success("✅ Lookbook-Bilder erfolgreich erstellt!")
 
-      # 2. Lookbook Visualisierung anzeigen (genau wie in deinem Beispiel)
+      # 2. Lookbook Visualisierung anzeigen
       st.markdown("### 🖼️ Lookbook Visualisation")
       st.image(
-          model_image_url,
-          caption="Lookbook Visualisation Example (Model-Shot)",
+          model_image_bytes,
+          caption="Lookbook Visualisation (Model-Shot)",
           use_container_width=True,
       )
-
       st.image(
-          detail_image_url,
-          caption="Detail Shot Visualisation Example (Label auf Beton)",
+          detail_image_bytes,
+          caption="Detail Shot Visualisation (Label auf Beton)",
           use_container_width=True,
       )
 
