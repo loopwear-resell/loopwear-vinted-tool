@@ -11,9 +11,8 @@ st.set_page_config(
 
 st.title("🛍️ Vinted Lookbook & Reseller Assistent")
 st.write(
-    "Lade deine Fotos hoch – die KI erkennt das Produkt automatisch,"
-    " generiert das perfekte Bild, die Preisschätzung und die Klick-Buttons"
-    " zum Kopieren!"
+    "Lade deine Fotos hoch – die KI liest Marken & Etiketten aus,"
+    " generiert das perfekte Bild und stellt dir Buttons zum Kopieren bereit!"
 )
 
 # Sidebar für Einstellungen / API-Key
@@ -32,7 +31,7 @@ else:
 # Hauptbereich: Datei-Upload für die Produktfotos
 st.markdown("### 📸 Produktfotos hochladen")
 uploaded_files = st.file_uploader(
-    "Lade alle Fotos hoch (Ansichten, Details, Etikett)",
+    "Lade alle Fotos hoch (Ansichten, Details, Etikett - besonders wichtig!)",
     type=["jpg", "jpeg", "png"],
     accept_multiple_files=True,
 )
@@ -49,7 +48,7 @@ image_style = st.radio(
     ],
 )
 
-if st.button("✨ Produkt analysieren & Listing generieren"):
+if st.button("✨ Produkt exakt erkennen & Listing generieren"):
   api_key = st.session_state.get("openai_api_key", "")
   if not api_key:
     st.warning("⚠️ Bitte trage links in der Sidebar deinen OpenAI API-Key ein.")
@@ -59,52 +58,53 @@ if st.button("✨ Produkt analysieren & Listing generieren"):
     client = openai.OpenAI(api_key=api_key)
 
     try:
-      # Wir nehmen das erste hochgeladene Foto, um das Produkt automatisch zu erkennen
-      first_image_bytes = uploaded_files[0].getvalue()
-      base64_first_image = base64.b64encode(first_image_bytes).decode("utf-8")
+      # Wir wandeln ALLE hochgeladenen Bilder in Base64 um, damit die KI das Etikett / Logo perfekt lesen kann!
+      image_messages = []
+      for uploaded_file in uploaded_files:
+        b64_img = base64.b64encode(uploaded_file.getvalue()).decode("utf-8")
+        image_messages.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"},
+        })
 
-      # 1. Automatische Produkterkennung via GPT-4o Vision
-      with st.spinner("🔍 Analysiere deine Fotos automatisch..."):
+      # 1. Verbesserte, extrem scharfe Texterkennung für Marke & Etikett über alle Bilder
+      with st.spinner("🔍 Analysiere Fotos, Etiketten und Markenlogos..."):
+        vision_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Du bist ein Experte für Luxus- und Markenkleidung."
+                    " Analysiere alle hochgeladenen Fotos (inklusive Etiketten,"
+                    " Logos und Schilder). Finde heraus, um welche MARKE und"
+                    " welches genaue Produkt es sich handelt. Antworte"
+                    " AUSSCHLIESSLICH mit einer klaren, präzisen Beschreibung"
+                    " auf Englisch (z.B. 'Armani black denim jeans' oder 'Armani"
+                    " trousers')."
+                ),
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Welche Marke und welches Produkt ist das? Achte"
+                            " genau auf Etiketten und Logos auf den Bildern."
+                        ),
+                    }
+                ]
+                + image_messages,
+            },
+        ]
+
         vision_response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Du bist ein Experte für Kleidung und Reselling. Analysiere"
-                        " das hochgeladene Foto genau. Antworte AUSSCHLIESSLICH"
-                        " mit einer präzisen Beschreibung auf Englisch (Marke,"
-                        " genauer Kleidungsstil, Farbe, Besonderheiten)."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Was genau ist das für ein Kleidungsstück auf"
-                                " dem Foto?"
-                            ),
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": (
-                                    f"data:image/jpeg;base64,{base64_first_image}"
-                                )
-                            },
-                        },
-                    ],
-                },
-            ],
-            max_tokens=100,
+            model="gpt-4o", messages=vision_messages, max_tokens=100
         )
         detected_product = vision_response.choices[0].message.content.strip()
 
-      st.info(f"💡 *Erkanntes Produkt:* {detected_product}")
+      st.info(f"💡 *Erkanntes Produkt & Marke:* {detected_product}")
 
-      # 2. Bildgenerierung
+      # 2. Bildgenerierung basierend auf dem echten Produkt
       with st.spinner("🎨 Generiere professionelles Präsentationsbild..."):
         if "Model" in image_style:
           selected_prompt = (
@@ -147,7 +147,7 @@ if st.button("✨ Produkt analysieren & Listing generieren"):
           mime="image/png",
       )
 
-      # 3. Vinted SEO Listing (Titel, Beschreibung getrennt) + Preisschätzung generieren
+      # 3. Vinted SEO Listing & Preisschätzung generieren
       with st.spinner("📝 Generiere Titel, Beschreibung & Vinted-Preisschätzung..."):
         seo_response = client.chat.completions.create(
             model="gpt-4o",
@@ -157,29 +157,28 @@ if st.button("✨ Produkt analysieren & Listing generieren"):
                     "content": (
                         "Du bist ein professioneller Vinted Reseller Experte."
                         " Antworte exakt im Format:\n"
-                        "TITEL: [Vollgepackt mit starken Such-Keywords, Marke,"
-                        " Produkt, Farbe, Stil, Größe]\n"
+                        "TITEL: [Vollgepackt mit starken Such-Keywords, erkannter"
+                        " Marke, Produkt, Farbe, Stil, Größe]\n"
                         "BESCHREIBUNG: [Saubere Beschreibung mit Emojis, Zustand,"
                         " Material. WICHTIG: Erfinde NIEMALS Maße, schreibe"
                         " stattdessen: 'Maße siehe Fotos (Etikett) oder bei"
                         " Bedarf gerne nachfragen'. Ganz unten SEO-Hashtags.]\n"
                         "PREIS: [Realistischer Vinted-Schnellverkaufspreis in Euro"
-                        " mit kurzer Begründung, z.B. '15-20 € (da starker"
-                        " Marken-Hype und guter Zustand)']"
+                        " mit kurzer Begründung]"
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
                         "Erstelle das Vinted-Listing und die Preisschätzung für"
-                        f" dieses Produkt: {detected_product}"
+                        f" dieses erkannte Produkt: {detected_product}"
                     ),
                 },
             ],
         )
         ai_output = seo_response.choices[0].message.content
 
-        # Text sauber aufteilen für separate Felder
+        # Text sauber aufteilen
         try:
           parts = ai_output.split("BESCHREIBUNG:")
           title_part = parts[0].replace("TITEL:", "").strip()
@@ -189,26 +188,23 @@ if st.button("✨ Produkt analysieren & Listing generieren"):
         except:
           title_part = detected_product
           desc_part = ai_output
-          price_part = "15-25 € (Standard-Empfehlung)"
+          price_part = "20-30 €"
 
       st.markdown("---")
-      st.markdown(
-          "### 📋 Vinted Listing Daten (Mit Klick-Buttons zum Kopieren)"
-      )
+      st.markdown("### 📋 Vinted Listing & Ein-Klick-Kopieren")
 
-      # Sichtbares Zusatzfeld für den Verkaufspreis (wird nicht in Listings kopiert)
+      # Verkaufspreis-Box
       st.metric(
           label="💰 Vinted-Preissempfehlung (für schnellen Verkauf)",
           value=price_part,
       )
 
-      st.markdown("#### 1. Titel (für das Titelfeld bei Vinted)")
-      st.text_input("Titel kopieren:", value=title_part, key="vinted_title")
+      # Echte Kopier-Buttons via Streamlit st.code / st.text_input
+      st.markdown("#### 1. Titel")
+      st.code(title_part, language=None)
 
-      st.markdown("#### 2. Beschreibung (für das Textfeld bei Vinted)")
-      st.text_area(
-          "Beschreibung kopieren:", value=desc_part, height=200, key="vinted_desc"
-      )
+      st.markdown("#### 2. Beschreibung")
+      st.code(desc_part, language=None)
 
     except Exception as e:
       st.error(f"Ein Fehler ist aufgetreten: {e}")
